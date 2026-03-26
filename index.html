@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TERMINAL ACCÈS | LOS FRUTAS</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Barlow:wght@400;500;600&family=Oswald:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- SUPABASE CDN -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+    <style>
+        /* ================= VARIABLES ================= */
+        :root {
+            --bg: #060608;
+            --bg2: #0c0c14;
+            --bg3: #111120;
+            --accent: #c8000a; 
+            --accent-dark: #8a0006;
+            --accent-glow: rgba(200,0,10,0.35);
+            --text: #dde0e8;
+            --text-muted: #8888a0;
+            --text-dim: #444455;
+            --border: rgba(200,0,10,0.3);
+            --glow: 0 0 15px rgba(200,0,10,0.5);
+            --font-mono: 'Courier New', Courier, monospace;
+            --font-title: 'Rajdhani', sans-serif;
+            --font-body: 'Barlow', sans-serif;
+            --font-label: 'Oswald', sans-serif;
+        }
+
+        /* ================= RESET & BASE ================= */
+        * { margin: 0; padding: 0; box-sizing: border-box; cursor: none; }
+        body { background-color: var(--bg); color: var(--text); font-family: var(--font-body); overflow-x: hidden; line-height: 1.6; }
+        
+        body::after {
+            content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%; z-index: 9999; pointer-events: none;
+        }
+
+        #custom-cursor { position: fixed; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; pointer-events: none; z-index: 10000; transform: translate(-50%, -50%); box-shadow: 0 0 10px var(--accent); transition: width 0.2s, height 0.2s; }
+        #custom-cursor.hover { width: 15px; height: 15px; background: transparent; border: 2px solid var(--accent); }
+        a { color: var(--accent); text-decoration: none; transition: 0.3s; }
+        a:hover { text-shadow: var(--glow); }
+        ul { list-style: none; }
+        .hidden { display: none !important; }
+        
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-10px); } 40%, 80% { transform: translateX(10px); } }
+        .shake { animation: shake 0.5s ease-in-out; border-color: red !important; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .blink { animation: blink 1s infinite; }
+        @keyframes glitch { 0% { clip-path: inset(10% 0 80% 0); transform: translate(-2px, 2px); } 20% { clip-path: inset(80% 0 5% 0); transform: translate(2px, -2px); } 40% { clip-path: inset(40% 0 40% 0); transform: translate(2px, 2px); } 60% { clip-path: inset(20% 0 60% 0); transform: translate(-2px, -2px); } 80% { clip-path: inset(60% 0 20% 0); transform: translate(2px, -2px); } 100% { clip-path: inset(10% 0 80% 0); transform: translate(-2px, 2px); } }
+        .fade-in { opacity: 0; transform: translateY(30px); transition: opacity 0.8s ease, transform 0.8s ease; }
+        .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+        /* ================= ÉCRAN DE LOGIN & INSCRIPTION ================= */
+        #login-screen, #loading-screen { height: 100vh; width: 100vw; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: var(--font-mono); background-color: #000; position: absolute; top: 0; left: 0; z-index: 1000; }
+        .terminal-box { border: 1px solid var(--border); padding: 30px; width: 420px; background: rgba(10, 0, 0, 0.8); box-shadow: 0 0 20px rgba(200,0,10,0.1); position: relative; }
+        .terminal-header { text-align: center; margin-bottom: 20px; color: var(--accent); }
+        .terminal-header h1 { font-family: var(--font-title); font-size: 2rem; letter-spacing: 5px; text-shadow: var(--glow); }
+        .terminal-warning { color: red; font-weight: bold; font-size: 0.9rem; margin-top: 10px; }
+        .input-group { margin-bottom: 15px; display: flex; align-items: center; }
+        .input-group label { width: 140px; color: var(--text-muted); }
+        .input-group input { background: transparent; border: none; border-bottom: 1px solid var(--text-dim); color: var(--accent); font-family: var(--font-mono); font-size: 1rem; flex-grow: 1; outline: none; padding: 5px; transition: 0.3s; }
+        .input-group input:focus { border-bottom: 1px solid var(--accent); box-shadow: 0 5px 5px -5px var(--accent); }
+        
+        .btn-terminal { width: 100%; background: transparent; border: 1px solid var(--accent); color: var(--accent); font-family: var(--font-mono); padding: 10px; margin-top: 10px; text-transform: uppercase; transition: 0.3s; }
+        .btn-terminal:hover { background: var(--accent); color: #000; box-shadow: var(--glow); }
+        
+        /* Bouton Visiteur */
+        .btn-guest { border-color: #555 !important; color: #888 !important; }
+        .btn-guest:hover { background: #333 !important; color: #fff !important; box-shadow: 0 0 10px rgba(255,255,255,0.2) !important; }
+
+        .switch-form-link { display: block; text-align: center; margin-top: 15px; font-size: 0.8rem; color: var(--text-muted); cursor: none; }
+        .switch-form-link:hover { color: var(--text); }
+        #login-status { margin-top: 15px; font-size: 0.8rem; color: var(--text-muted); text-align: center; }
+        #login-error { color: red; margin-top: 10px; text-align: center; font-weight: bold; min-height: 20px;}
+
+        /* Loading Screen */
+        #loading-text { color: #0f0; width: 600px; line-height: 1.8; font-size: 1.1rem; }
+        .log-success { color: #0f0; }
+        .log-warning { color: #ff0; }
+        .log-highlight { color: var(--text); background: var(--accent); padding: 0 5px; }
+        .log-guest { color: var(--text); background: #555; padding: 0 5px; }
+
+        /* ================= NAVIGATION & SITE ================= */
+        nav { position: fixed; top: 0; width: 100%; padding: 20px 50px; display: flex; justify-content: space-between; align-items: center; z-index: 100; transition: 0.4s; backdrop-filter: blur(0px); border-bottom: 1px solid transparent; }
+        nav.scrolled { background: rgba(6, 6, 8, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); padding: 15px 50px; }
+        .logo { font-family: var(--font-title); font-size: 1.8rem; font-weight: 700; color: var(--text); letter-spacing: 2px;}
+        .logo span { color: var(--accent); }
+        .nav-links { display: flex; gap: 25px; }
+        .nav-links a { font-family: var(--font-label); text-transform: uppercase; color: var(--text-muted); font-size: 0.9rem; letter-spacing: 1px; }
+        .nav-links a:hover, .nav-links a.active { color: var(--text); text-shadow: 0 0 8px rgba(255,255,255,0.5); }
+        .user-widget { display: flex; align-items: center; gap: 15px; }
+        .rank-badge { font-family: var(--font-label); font-size: 0.8rem; padding: 4px 10px; border: 1px solid var(--accent); color: var(--accent); border-radius: 3px; text-transform: uppercase; background: rgba(200,0,10,0.1); }
+        #btn-logout { background: transparent; border: none; color: var(--text-muted); font-size: 1rem; transition: 0.3s; }
+        #btn-logout:hover { color: var(--accent); text-shadow: var(--glow); }
+
+        #accueil { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; background: radial-gradient(circle at center, var(--bg2) 0%, var(--bg) 100%); }
+        .glitch-title { font-family: var(--font-title); font-size: 6rem; font-weight: 700; text-transform: uppercase; position: relative; color: var(--text); text-shadow: 0 0 10px rgba(255,255,255,0.1); margin-bottom: 10px; }
+        .glitch-title::before, .glitch-title::after { content: attr(data-text); position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .glitch-title::before { color: #0ff; z-index: -1; animation: glitch 3s infinite linear alternate-reverse; }
+        .glitch-title::after { color: var(--accent); z-index: -2; animation: glitch 2.5s infinite linear alternate-reverse; }
+        .hero-subtitle { font-family: var(--font-mono); font-size: 1.2rem; color: var(--accent); margin-bottom: 30px; letter-spacing: 4px; }
+        .welcome-msg { font-family: var(--font-label); font-size: 1.5rem; color: var(--text-muted); margin-bottom: 50px; }
+        .stats-container { display: flex; gap: 50px; margin-bottom: 50px; }
+        .stat-box { text-align: center; }
+        .stat-number { font-family: var(--font-title); font-size: 3rem; color: var(--text); text-shadow: var(--glow); }
+        .stat-label { font-family: var(--font-label); color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        .cta-group { display: flex; gap: 20px; }
+        .btn { padding: 12px 30px; font-family: var(--font-label); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; border: 1px solid var(--accent); background: transparent; color: var(--text); transition: 0.3s; position: relative; overflow: hidden; }
+        .btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: var(--accent); transition: 0.3s; z-index: -1; }
+        .btn:hover::before { left: 0; }
+        .btn:hover { box-shadow: var(--glow); }
+        .btn-solid { background: var(--accent); color: #000; font-weight: bold; border-color: var(--accent); }
+        .btn-solid:hover { background: transparent; color: var(--accent); }
+        section { padding: 100px 10%; min-height: 100vh; border-top: 1px solid var(--bg3); }
+        .section-title { font-family: var(--font-title); font-size: 3rem; color: var(--text); text-transform: uppercase; margin-bottom: 50px; border-left: 5px solid var(--accent); padding-left: 15px; letter-spacing: 2px; }
+        #histoire .dossier { background: var(--bg2); border: 1px solid var(--border); padding: 40px; position: relative; max-width: 800px; margin: 0 auto; }
+        #histoire .dossier::before { content: 'CONFIDENTIEL'; position: absolute; top: 20px; right: 20px; font-family: var(--font-label); font-size: 2rem; color: rgba(200,0,10,0.1); transform: rotate(15deg); border: 3px solid rgba(200,0,10,0.1); padding: 5px 10px; }
+        .timeline { margin-top: 50px; position: relative; padding-left: 30px; border-left: 2px solid var(--accent-dark); }
+        .timeline-item { margin-bottom: 30px; position: relative; }
+        .timeline-item::before { content: ''; position: absolute; left: -36px; top: 5px; width: 10px; height: 10px; background: var(--bg); border: 2px solid var(--accent); border-radius: 50%; }
+        .timeline-date { font-family: var(--font-mono); color: var(--accent); font-weight: bold; margin-bottom: 5px; }
+        .members-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; }
+        .member-card { background: var(--bg2); border: 1px solid var(--bg3); padding: 20px; text-align: center; transition: 0.3s; position: relative; overflow: hidden; }
+        .member-card:hover { border-color: var(--accent); box-shadow: 0 0 15px rgba(200,0,10,0.2); transform: translateY(-5px); }
+        .member-avatar { width: 80px; height: 80px; margin: 0 auto 15px; border-radius: 50%; background: var(--bg3); display: flex; justify-content: center; align-items: center; font-family: var(--font-title); font-size: 2rem; color: var(--text-muted); border: 2px solid var(--border); }
+        .member-name { font-family: var(--font-title); font-size: 1.5rem; margin-bottom: 5px; }
+        .member-role { font-family: var(--font-label); color: var(--accent); font-size: 0.9rem; margin-bottom: 15px; }
+        .status { font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 5px; color: var(--text-muted); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-online { background: #0f0; box-shadow: 0 0 5px #0f0; }
+        .status-offline { background: red; }
+        .status-mission { background: #ffcc00; }
+        .ops-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+        .op-card { background: linear-gradient(to bottom, var(--bg2), var(--bg)); border-top: 3px solid var(--text-dim); padding: 25px; transition: 0.3s; }
+        .op-card:hover { border-top-color: var(--accent); background: linear-gradient(to bottom, #1a0505, var(--bg)); }
+        .op-title { font-family: var(--font-title); font-size: 1.4rem; margin-bottom: 10px; }
+        .op-status { display: inline-block; padding: 3px 8px; font-size: 0.7rem; font-family: var(--font-mono); background: rgba(255,255,255,0.1); margin-bottom: 15px;}
+        .op-status.active { background: rgba(200,0,10,0.2); color: var(--accent); border: 1px solid var(--accent); }
+        .gallery-filters { display: flex; justify-content: center; gap: 15px; margin-bottom: 30px; }
+        .filter-btn { background: transparent; border: none; color: var(--text-muted); font-family: var(--font-label); font-size: 1rem; text-transform: uppercase; transition: 0.3s; }
+        .filter-btn.active, .filter-btn:hover { color: var(--accent); text-shadow: var(--glow); }
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+        .gallery-item { height: 200px; background: var(--bg3); overflow: hidden; position: relative; }
+        .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; filter: grayscale(80%) contrast(1.2); }
+        .gallery-item:hover img { filter: grayscale(0%) contrast(1); transform: scale(1.1); }
+        .gallery-overlay { position: absolute; bottom: -100%; left: 0; width: 100%; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); transition: 0.3s; font-family: var(--font-label); }
+        .gallery-item:hover .gallery-overlay { bottom: 0; }
+        .recrutement-container { display: flex; gap: 50px; flex-wrap: wrap; }
+        .recrutement-info { flex: 1; min-width: 300px; }
+        .recrutement-form { flex: 1; min-width: 300px; background: var(--bg2); padding: 30px; border: 1px solid var(--bg3); }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-family: var(--font-label); color: var(--text-muted); margin-bottom: 5px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; background: var(--bg); border: 1px solid var(--bg3); color: var(--text); padding: 10px; font-family: var(--font-body); transition: 0.3s; outline: none; resize: vertical; }
+        .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); box-shadow: 0 0 5px rgba(200,0,10,0.2); }
+        #form-success { display: none; margin-top: 20px; padding: 15px; background: rgba(0,255,0,0.1); border: 1px solid #0f0; color: #0f0; font-family: var(--font-mono); text-align: center; }
+        .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; }
+        .social-links { display: flex; flex-direction: column; gap: 15px; }
+        .social-link { display: flex; align-items: center; gap: 15px; font-family: var(--font-mono); font-size: 1.1rem; }
+        footer { background: #000; padding: 30px; text-align: center; border-top: 1px solid var(--border); }
+        .footer-text { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim); margin-top: 15px; }
+        @media (max-width: 768px) { .nav-links { display: none; } .glitch-title { font-size: 3.5rem; } .stats-container { flex-direction: column; gap: 20px; } section { padding: 60px 5%; } .contact-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <div id="custom-cursor"></div>
+
+    <!-- ÉCRAN DE LOGIN & INSCRIPTION -->
+    <div id="login-screen">
+        <div class="terminal-box">
+            <div class="terminal-header">
+                <h1>Los Frustas</h1>
+                <p class="blink">TERMINAL_SECURISE</p>
+                <p class="terminal-warning blink">⚠ ACCÈS RESTREINT</p>
+            </div>
+            
+            <!-- FORMULAIRE CONNEXION -->
+            <div id="login-form-container">
+                <div class="input-group">
+                    <label>> IDENTIFIANT:</label>
+                    <input type="text" id="username" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="input-group">
+                    <label>> Password :</label>
+                    <input type="password" id="password">
+                </div>
+                <button class="btn-terminal" id="btn-login">[ CONNEXION ]</button>
+                <a href="#" class="switch-form-link" id="link-to-register"> Demander un accès</a>
+            </div>
+
+            <!-- FORMULAIRE INSCRIPTION (Caché par défaut) -->
+            <div id="register-form-container" class="hidden">
+                <div class="input-group">
+                    <label>> EMAIL:</label>
+                    <input type="email" id="reg-email" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="input-group">
+                    <label>> IDENTIFIANT:</label>
+                    <input type="text" id="reg-username" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="input-group">
+                    <label>> MOT DE PASSE:</label>
+                    <input type="password" id="reg-password">
+                </div>
+                <button class="btn-terminal" id="btn-register">[ SOUMETTRE ]</button>
+                <a href="#" class="switch-form-link" id="link-to-login"><< Retour à l'identification</a>
+            </div>
+            
+            <div id="login-error"></div>
+            <div id="login-status">Tentatives restantes : <span id="attempts-count">3</span></div>
+
+            <!-- SEPARATEUR ET MODE VISITEUR -->
+            <div style="margin-top: 25px; border-top: 1px dashed var(--text-dim); padding-top: 15px; text-align: center;">
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;"> Accès public non-classifié</p>
+                <button class="btn-terminal btn-guest" id="btn-guest">[ ENTRER COMME VISITEUR ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ÉCRAN DE CHARGEMENT -->
+    <div id="loading-screen" class="hidden">
+        <div id="loading-text"></div>
+    </div>
+
+    <!-- LE SITE -->
+    <div id="main-site" class="hidden">
+        <!-- BARRE DE NAVIGATION -->
+        <nav id="navbar">
+            <div class="logo">LOS<span>FRUTAS</span></div>
+            <ul class="nav-links">
+                <li><a href="#accueil" class="active">Accueil</a></li>
+                <li><a href="#histoire">Lore</a></li>
+                <li><a href="#equipe">Membres</a></li>
+                <li><a href="#activites">Opérations</a></li>
+                <li><a href="#galerie">Galerie</a></li>
+                <li><a href="#recrutement">Recrutement</a></li>
+            </ul>
+            <div class="user-widget">
+                <div class="rank-badge" id="nav-rank">Inconnu</div>
+                <button id="btn-logout" title="Déconnexion">⏻</button>
+            </div>
+        </nav>
+
+        <header id="accueil">
+            <h1 class="glitch-title" data-text="LOS FRUTAS">LOS FRUTAS</h1>
+            <p class="hero-subtitle">OMERTÀ · LOYAUTÉ · POUVOIR</p>
+            <p class="welcome-msg fade-in" id="hero-welcome">Initialisation...</p>
+            <div class="stats-container fade-in">
+                <div class="stat-box"><div class="stat-number" data-target="1">0</div><div class="stat-label">Membres Actifs</div></div>
+                <div class="stat-box"><div class="stat-number" data-target="1">0</div><div class="stat-label">Jours d'existence</div></div>
+                <div class="stat-box"><div class="stat-number" data-target="0">0</div><div class="stat-label">Opérations réussies</div></div>
+            </div>
+            <div class="cta-group fade-in"><a href="#activites" class="btn btn-solid">Nos Opérations</a><a href="#recrutement" class="btn">Rejoindre</a></div>
+        </header>
+
+        <section id="histoire">
+            <h2 class="section-title fade-in">Dossier Classifié</h2>
+            <div class="dossier fade-in">
+                
+                <h3 style="color: var(--accent); margin-bottom: 10px; font-family: var(--font-title); font-size: 1.8rem; text-transform: uppercase;">Origines : La Famine de l'Archipel (circa 1890)</h3>
+                <p>Portolina est une île méditerranéenne semi-fictive, fertile mais isolée, dont l'économie reposait historiquement sur l'agriculture fruitière — agrumes, figues, grenades — exportés vers les ports continentaux. En 1887, une série de tempêtes dévasta les récoltes pendant trois années consécutives. Les marchands extérieurs profitèrent de la famine pour imposer des prix d'importation exorbitants. Le gouverneur de l'époque, corrompu et absent, laissa les habitants mourir de faim.</p>
+                <p style="margin-top: 10px;">C'est dans ce contexte qu'un ancien contrebandier nommé Salvatore "El Coco" Amaro réunit sept familles de pêcheurs et de paysans. Ensemble, ils organisèrent un réseau de distribution alimentaire clandestin — volant aux entrepôts des marchands continentaux pour nourrir les leurs. Ils se surnommèrent <strong>Los Frutas</strong>, en référence aux vergers brûlés qui avaient tout déclenché. Un nom humble, presque ironique, pour une organisation qui allait devenir la colonne vertébrale de Portolina.</p>
+
+                <h3 style="color: var(--accent); margin-top: 30px; margin-bottom: 15px; font-family: var(--font-title); font-size: 1.8rem; text-transform: uppercase;">Structure : Les Sept Branches</h3>
+                <p>L'organisation est divisée en sept branches, chacune héritière d'une des familles fondatrices. On les appelle les <strong>Ramas</strong> (les Rameaux). Chaque Rama contrôle un secteur vital de l'île. Les sept chefs de Rama forment le <strong>Conseil des Vergers</strong>, l'organe décisionnel suprême. Aucune décision majeure n'est prise sans un vote à majorité qualifiée (cinq voix sur sept).</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-top: 15px; font-size: 0.9rem;">
+                    <div style="background: rgba(255,255,255,0.05); padding: 10px; border-left: 2px solid var(--accent);"><strong>Amaro (La Grenade)</strong><br><span style="color: var(--text-muted)">Direction centrale & diplomatie</span></div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 10px; border-left: 2px solid var(--accent);"><strong>Ferreira (Le Citron)</strong><br><span style="color: var(--text-muted)">Commerce & douanes</span></div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 10px; border-left: 2px solid var(--accent);"><strong>Osei (La Figue)</strong><br><span style="color: var(--text-muted)">Renseignement & contre-espionnage</span></div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 10px; border-left: 2px solid var(--accent);"><strong>Delacroix (La Mangue)</strong><br><span style="color: var(--text-muted)">Forces d'ordre internes</span></div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 10px; border-left: 2px solid var(--accent);"><strong>Vásquez (L'Olive)</strong><br><span style="color: var(--text-muted)">Agriculture & ravitaillement</span></div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 10px; border-left: 2px solid var(--accent);"><strong>Nakamura (Le Piment)</strong><br><span style="color: var(--text-muted)">Technologie & communications</span></div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 10px; border-left: 2px solid var(--accent);"><strong>Brecht (L'Orange Amère)</strong><br><span style="color: var(--text-muted)">Justice & arbitrage des conflits</span></div>
+                </div>
+
+                <h3 style="color: var(--accent); margin-top: 30px; margin-bottom: 10px; font-family: var(--font-title); font-size: 1.8rem; text-transform: uppercase;">La Règle du Verger</h3>
+                <p>Los Frutas fonctionne selon un code de conduite interne transmis oralement de génération en génération :</p>
+                <p style="font-style: italic; color: var(--text); margin: 15px 0; border-left: 3px solid var(--accent); padding-left: 15px;">"L'arbre ne produit que s'il est enraciné. Nous protégeons les racines."</p>
+                <ul style="color: var(--text-muted); line-height: 1.8; list-style-type: none;">
+                    <li>> <strong>Protection Civile :</strong> Jamais de violence contre un civil innocent. Quiconque blesse un habitant sans raison légitime est exclu, ou éliminé si la faute est grave.</li>
+                    <li>> <strong>Anti-Racket :</strong> Le racket est interdit sur le sol de Portolina. Les revenus viennent de l'extérieur (contrebande, protection de navires, arbitrage international). L'île ne paie pas de tribut.</li>
+                    <li>> <strong>Responsabilité :</strong> Chaque Rama est responsable de son secteur. Si un quartier souffre, c'est la honte de la Rama qui le gère.</li>
+                    <li>> <strong>Justice :</strong> Le Conseil arbitre. Nul ne fait justice seul.</li>
+                </ul>
+
+                <h3 style="color: var(--accent); margin-top: 30px; margin-bottom: 10px; font-family: var(--font-title); font-size: 1.8rem; text-transform: uppercase;">Entre État-Fantôme et Protecteur</h3>
+                <p>Aujourd'hui, Los Frutas est officiellement une "association culturelle et économique" enregistrée à Portolina. En réalité, ils remplissent les fonctions que l'État n'a jamais su assurer :</p>
+                <ul style="margin-top: 10px; color: var(--text-muted); line-height: 1.8; list-style-type: square; padding-left: 20px;">
+                    <li>Gestion d'un réseau de soignants financé par l'organisation (soins gratuits pour les résidents).</li>
+                    <li>Maintien d'une milice de quartier (les <em>Jardineros</em> aux brassards verts) pour patrouiller la nuit.</li>
+                    <li>Arbitrage des disputes commerciales et familiales via la Rama Brecht.</li>
+                    <li>Contrôle du port via la Rama Ferreira : aucune marchandise douteuse n'entre sans aval.</li>
+                    <li>Financement des écoles publiques lorsque les subventions étatiques n'arrivent pas.</li>
+                </ul>
+
+                <div class="timeline" style="margin-top: 40px;">
+                    <div class="timeline-item fade-in">
+                        <div class="timeline-date">Tensions Internes : Les Nouvelles Graines</div>
+                        <p>Une faction minoritaire (Rama Nakamura et Delacroix) plaide pour une modernisation radicale (cybercriminalité, expansion) et l'abandon de la non-violence. Les gardiens de la tradition (notamment Esperanza Vásquez, 74 ans) résistent. Le prochain vote du Conseil pourrait décider de l'âme de l'organisation.</p>
+                    </div>
+                    <div class="timeline-item fade-in">
+                        <div class="timeline-date">Symboles & Culture</div>
+                        <p><strong>L'emblème :</strong> Une grenade à 7 graines colorées dans un cercle d'olivier.<br>
+                        <strong>Le salut :</strong> Pouce et index en cercle ("saisir un fruit").<br>
+                        <strong>La Fête des Vergers :</strong> Grand marché d'automne gratuit affirmant leur légitimité.<br>
+                        <strong>Les Jardineros :</strong> Portent une feuille d'arbre séchée en mémoire des ancêtres.</p>
+                    </div>
+                    <div class="timeline-item fade-in">
+                        <div class="timeline-date">Ennemis & Rivaux</div>
+                        <p><strong>La Mano Blu :</strong> Organisation continentale tentant de pénétrer le port.<br>
+                        <strong>L'Agence Federale :</strong> Unité gouvernementale incapable de prouver leurs soupçons grâce à l'omertà des habitants.<br>
+                        <strong>Les Indépendants du Détroit :</strong> Contrebandiers contestant le monopole maritime.</p>
+                    </div>
+                </div>
+                
+                <p style="margin-top: 40px; font-weight: bold; text-align: center; color: var(--text);">Los Frutas n'est ni des saints, ni des criminels ordinaires. Ils sont le fruit d'un vide — et tant que l'État restera absent de Portolina, leurs racines plongeront plus profond que jamais.</p>
+            </div>
+        </section>
+        
+        <section id="equipe"><h2 class="section-title fade-in">Hiérarchie</h2><div class="members-grid" id="members-container"></div></section>
+        
+        <section id="activites"><h2 class="section-title fade-in">Opérations</h2><div class="ops-grid fade-in"><div class="op-card"><div class="op-title">Import / Export</div><div class="op-status active">En cours</div><p>Gestion des arrivages maritimes. Armement et véhicules de luxe.</p></div><div class="op-card"><div class="op-title">Blanchiment</div><div class="op-status">Continu</div><p>Réseau d'entreprises façades pour légitimer les fonds.</p></div><div class="op-card"><div class="op-title">Contrats Privés</div><div class="op-status">Sur demande</div><p>Sécurité VIP, recouvrement de dettes, "résolution" de conflits.</p></div></div></section>
+        
+        <section id="galerie"><h2 class="section-title fade-in">Réseau Visuel</h2><div class="gallery-filters fade-in"><button class="filter-btn active" data-filter="all">Tout</button><button class="filter-btn" data-filter="ops">Opérations</button><button class="filter-btn" data-filter="territoire">Territoire</button></div><div class="gallery-grid fade-in"><div class="gallery-item ops"><img src="https://picsum.photos/400/300?random=1" alt="Go Fast"><div class="gallery-overlay">Convoi Nocturne</div></div><div class="gallery-item territoire"><img src="https://picsum.photos/400/300?random=2" alt="Planque"><div class="gallery-overlay">Entrepôt Sud</div></div><div class="gallery-item ops"><img src="https://picsum.photos/400/300?random=3" alt="Rencontre"><div class="gallery-overlay">Transaction</div></div><div class="gallery-item territoire"><img src="https://picsum.photos/400/300?random=4" alt="Ville"><div class="gallery-overlay">Contrôle Secteur Est</div></div></div></section>
+        
+        <section id="recrutement"><h2 class="section-title fade-in">Rejoindre les Rangs</h2><div class="recrutement-container"><div class="recrutement-info fade-in"><h3 style="font-family: var(--font-title); font-size: 2rem; margin-bottom: 20px;">Critères d'entrée</h3><ul style="color: var(--text-muted); line-height: 2;"><li>> Âge mental requis</li><li>> Présence exigée</li><li>> Capacité à obéir aux ordres</li><li>> Micro de bonne qualité</li></ul><p style="margin-top: 20px; color: var(--accent);">Le non-respect de l'Omertà est puni de mort RP.</p></div><form class="recrutement-form fade-in" id="recrut-form"><div class="form-group"><label>Pseudo IG / Nom RP</label><input type="text" required></div><div class="form-group"><label>Discord (Ex: user#1234)</label><input type="text" required></div><div class="form-group"><label>Spécialité visée</label><select><option>Tireur / Soldat</option><option>Pilote (Go-Fast)</option><option>Négociateur / Façade légale</option></select></div><div class="form-group"><label>Motivations (1O lignes)</label><textarea rows="4" required></textarea></div><button type="submit" class="btn btn-solid" style="width: 100%;">Envoyer la candidature</button><div id="form-success">> Transmission sécurisée... Candidature reçue.</div></form></div></section>
+        
+        <footer id="contact"><h2 style="font-family: var(--font-title); font-size: 2rem; margin-bottom: 30px; color: var(--text);">CONTACT EN HRP</h2><div class="social-links" style="display: flex; justify-content: center; flex-direction: row; gap: 30px; margin-bottom: 40px;"><a href="#" class="social-link">> Discord</a><a href="#" class="social-link">> FlashBackFA</a><a href="#" class="social-link">> By MzR</a></div><div class="footer-text">&copy; 2026 LOS FRUTAS. Réservé à l'usage interne.<br>Ce site est un projet fictif pour le Roleplay sur Grand Theft Auto V.</div></footer>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. CURSEUR CUSTOM 
+        // ==========================================
+        const cursor = document.getElementById('custom-cursor');
+        document.addEventListener('mousemove', e => { cursor.style.left = e.clientX + 'px'; cursor.style.top = e.clientY + 'px'; });
+        document.addEventListener('mousedown', () => cursor.style.transform = 'translate(-50%, -50%) scale(0.8)');
+        document.addEventListener('mouseup', () => cursor.style.transform = 'translate(-50%, -50%) scale(1)');
+        
+        const observerDOM = new MutationObserver(() => {
+            document.querySelectorAll('a, button, input, select, textarea').forEach(el => {
+                if (!el.dataset.cursorObserved) { el.addEventListener('mouseenter', () => cursor.classList.add('hover')); el.addEventListener('mouseleave', () => cursor.classList.remove('hover')); el.dataset.cursorObserved = "true"; }
+            });
+        });
+        observerDOM.observe(document.body, { childList: true, subtree: true });
+
+        // ==========================================
+        // 2. CONFIGURATION SUPABASE
+        // ==========================================
+        const supabaseUrl = 'https://wpymqaokqehnjruqyhrr.supabase.co';
+        const supabaseKey = 'sb_publishable_mX4_-tdwzB_XaFVcbJrRmQ_Wltv4nr-';
+        
+        const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        const membresLocaux = [
+            { user: "ElJefe", pass: "boss123", rang: "Parrain", couleur: "#c8000a", nom: "Don Carmine", statut: "online" },
+            { user: "BrasDroit", pass: "under", rang: "Underboss", couleur: "#ff4d00", nom: "Vito S.", statut: "online" },
+            { user: "Ghost", pass: "soldat", rang: "Capo", couleur: "#a80000", nom: "Ghost", statut: "mission" }
+        ];
+
+        let attempts = 3;
+        let isLocked = false;
+
+        const loginScreen = document.getElementById('login-screen');
+        const loadingScreen = document.getElementById('loading-screen');
+        const mainSite = document.getElementById('main-site');
+        const errorDiv = document.getElementById('login-error');
+        const attemptsSpan = document.getElementById('attempts-count');
+        const terminalBox = document.querySelector('.terminal-box');
+        const loginContainer = document.getElementById('login-form-container');
+        const registerContainer = document.getElementById('register-form-container');
+
+        // Switch Formulaires
+        document.getElementById('link-to-register').addEventListener('click', (e) => { e.preventDefault(); loginContainer.classList.add('hidden'); registerContainer.classList.remove('hidden'); errorDiv.innerText = ""; });
+        document.getElementById('link-to-login').addEventListener('click', (e) => { e.preventDefault(); registerContainer.classList.add('hidden'); loginContainer.classList.remove('hidden'); errorDiv.innerText = ""; });
+
+        if(sessionStorage.getItem('syndicat_auth') === 'true') { showMainSite(); }
+
+        // --- MODE VISITEUR ---
+        document.getElementById('btn-guest').addEventListener('click', (e) => {
+            e.preventDefault();
+            const guestUser = { user: "visiteur", pass: "", rang: "Visiteur", couleur: "#555", nom: "Anonyme", statut: "online" };
+            sessionStorage.setItem('syndicat_auth', 'true');
+            sessionStorage.setItem('syndicat_user', JSON.stringify(guestUser));
+            startLoadingSequence(guestUser, true);
+        });
+
+        // --- INSCRIPTION ---
+        document.getElementById('btn-register').addEventListener('click', async () => {
+            const e = document.getElementById('reg-email').value;
+            const u = document.getElementById('reg-username').value;
+            const p = document.getElementById('reg-password').value;
+
+            if(!e || !u || !p) { errorDiv.style.color = "red"; errorDiv.innerText = "> ERREUR : Données incomplètes."; return; }
+
+            const newUser = { 
+                email: e, 
+                identifiant: u, 
+                mdp: p, 
+                rang: 'Associé', 
+                couleur: '#888', 
+                nom: u, 
+                statut: 'offline' 
+            };
+
+            if (supabaseClient) {
+                const { error } = await supabaseClient.from('utilisateurs').insert([newUser]);
+                
+                if (error) {
+                    errorDiv.style.color = "red";
+                    errorDiv.innerText = "> ERREUR RÉSEAU : " + error.message;
+                } else {
+                    errorDiv.style.color = "#0f0";
+                    errorDiv.innerText = "> CRÉDENTIALS ENREGISTRÉS. Retour au login...";
+                    setTimeout(() => document.getElementById('link-to-login').click(), 2000);
+                }
+            } else {
+                membresLocaux.push({ user: u, pass: p, rang: "Associé", couleur: "#888", nom: u, statut: "offline" });
+                errorDiv.style.color = "#0f0";
+                errorDiv.innerText = "> [MODE HORS-LIGNE] CRÉDENTIALS SAUVEGARDÉS.";
+                setTimeout(() => document.getElementById('link-to-login').click(), 2000);
+            }
+        });
+
+        // --- CONNEXION ---
+        document.getElementById('btn-login').addEventListener('click', handleLogin);
+        document.getElementById('password').addEventListener('keypress', (e) => { if(e.key === 'Enter') handleLogin(); });
+
+        async function handleLogin() {
+            if (isLocked) return;
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            let user = null;
+
+            if (supabaseClient) {
+                const { data, error } = await supabaseClient.from('utilisateurs').select('*').eq('identifiant', u).eq('mdp', p).single();
+                if (data) user = { user: data.identifiant, pass: data.mdp, rang: data.rang, couleur: data.couleur, nom: data.nom, statut: data.statut };
+            } else {
+                user = membresLocaux.find(m => m.user === u && m.pass === p);
+            }
+
+            if (user) {
+                sessionStorage.setItem('syndicat_auth', 'true');
+                sessionStorage.setItem('syndicat_user', JSON.stringify(user));
+                startLoadingSequence(user, false);
+            } else {
+                attempts--; attemptsSpan.innerText = attempts;
+                terminalBox.classList.remove('shake'); void terminalBox.offsetWidth; terminalBox.classList.add('shake');
+                errorDiv.style.color = "red"; errorDiv.innerText = "> ERREUR : Identifiants invalides.";
+
+                if (attempts <= 0) {
+                    isLocked = true; errorDiv.innerText = "> VERROUILLAGE SYSTÈME : 30 secondes.";
+                    document.getElementById('btn-login').style.opacity = '0.5';
+                    setTimeout(() => { isLocked = false; attempts = 3; attemptsSpan.innerText = attempts; errorDiv.innerText = ""; document.getElementById('btn-login').style.opacity = '1'; }, 30000);
+                }
+            }
+        }
+
+        // --- SEQUENCE TERMINAL ---
+        function startLoadingSequence(user, isGuest) {
+            loginScreen.classList.add('hidden');
+            loadingScreen.classList.remove('hidden');
+            const textDiv = document.getElementById('loading-text');
+            
+            let lines = [];
+            if (isGuest) {
+                lines = [
+                    `> Protocole visiteur initié...`,
+                    `> Contournement des sécurités primaires... <span class="log-warning">[██████░░░░] 60%</span>`,
+                    `> Masquage de l'adresse IP...              <span class="log-success">OK</span>`,
+                    `> Accès restreint accordé...               <span class="log-success">OK</span>`,
+                    `<br>> <span class="log-guest">BIENVENUE, VISITEUR</span>`,
+                    `> Redirection vers la zone publique...`
+                ];
+            } else {
+                lines = [
+                    `> Connexion demandée par : ${user.user}...`,
+                    `> Authentification chiffrée...        <span class="log-warning">[██████░░░░] 60%</span>`,
+                    `> Vérification de la clé secrète...   <span class="log-success">[██████████] 100%</span>`,
+                    `> Accès serveur autorisé...           <span class="log-success">OK</span>`,
+                    `<br>> <span class="log-highlight">BIENVENUE, ${user.rang.toUpperCase()} ${user.nom.toUpperCase()}</span>`,
+                    `> Déverrouillage...`
+                ];
+            }
+
+            let i = 0; textDiv.innerHTML = "";
+            function typeLine() {
+                if (i < lines.length) {
+                    textDiv.innerHTML += lines[i] + "<br>"; i++;
+                    setTimeout(typeLine, 400 + Math.random() * 300);
+                } else {
+                    setTimeout(() => { loadingScreen.classList.add('hidden'); showMainSite(); }, 1000);
+                }
+            }
+            typeLine();
+        }
+
+        // --- AFFICHAGE DU SITE ---
+        async function showMainSite() {
+            loginScreen.classList.add('hidden'); loadingScreen.classList.add('hidden'); mainSite.classList.remove('hidden');
+            const userData = JSON.parse(sessionStorage.getItem('syndicat_user')) || { rang: "Anonyme", nom: "User", couleur: "#888" };
+            
+            document.getElementById('nav-rank').innerText = userData.rang;
+            document.getElementById('nav-rank').style.borderColor = userData.couleur;
+            document.getElementById('nav-rank').style.color = userData.couleur;
+            
+            if (userData.rang === 'Visiteur') {
+                document.getElementById('hero-welcome').innerText = `Accès restreint - Navigation en mode Visiteur`;
+            } else {
+                document.getElementById('hero-welcome').innerText = `Connexion établie : ${userData.rang} ${userData.nom}`;
+            }
+
+            let listeMembres = membresLocaux;
+            if (supabaseClient) {
+                const { data } = await supabaseClient.from('utilisateurs').select('*');
+                if (data) listeMembres = data;
+            }
+            initSiteFeatures(listeMembres);
+        }
+
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            sessionStorage.removeItem('syndicat_auth'); sessionStorage.removeItem('syndicat_user'); window.location.reload();
+        });
+
+        // --- INITIALISATION FONCTIONS SITE ---
+        function initSiteFeatures(membresData) {
+            const container = document.getElementById('members-container');
+            container.innerHTML = ""; 
+            
+            const vraisMembres = membresData.filter(m => m.rang !== 'Visiteur');
+
+            vraisMembres.forEach(m => {
+                let nomAffiche = m.nom || m.identifiant;
+                let statusClass = m.statut === 'online' ? 'status-online' : m.statut === 'mission' ? 'status-mission' : 'status-offline';
+                let statusText = m.statut === 'online' ? 'En ligne' : m.statut === 'mission' ? 'En mission' : 'Hors ligne';
+                
+                container.innerHTML += `
+                    <div class="member-card fade-in">
+                        <div class="member-avatar" style="border-color: ${m.couleur}">${nomAffiche.charAt(0).toUpperCase()}</div>
+                        <h3 class="member-name">${nomAffiche}</h3>
+                        <div class="member-role" style="color: ${m.couleur}">${m.rang}</div>
+                        <div class="status">
+                            <div class="status-dot ${statusClass}"></div> ${statusText}
+                        </div>
+                    </div>
+                `;
+            });
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        if (entry.target.classList.contains('stats-container')) {
+                            document.querySelectorAll('.stat-number').forEach(el => {
+                                const target = +el.getAttribute('data-target');
+                                let count = 0; const speed = target / 50;
+                                const updateCount = () => { count += speed; if(count < target) { el.innerText = Math.ceil(count); requestAnimationFrame(updateCount); } else { el.innerText = target; } };
+                                updateCount();
+                            });
+                        }
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+            window.addEventListener('scroll', () => {
+                const nav = document.getElementById('navbar');
+                if (window.scrollY > 50) nav.classList.add('scrolled'); else nav.classList.remove('scrolled');
+                let current = '';
+                document.querySelectorAll('section, header').forEach(sec => { if (window.scrollY >= sec.offsetTop - 100) current = sec.getAttribute('id'); });
+                document.querySelectorAll('.nav-links a').forEach(a => { a.classList.remove('active'); if (a.getAttribute('href').includes(current)) a.classList.add('active'); });
+            });
+
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); e.target.classList.add('active');
+                    const filter = e.target.getAttribute('data-filter');
+                    document.querySelectorAll('.gallery-item').forEach(item => { if (filter === 'all' || item.classList.contains(filter)) item.style.display = 'block'; else item.style.display = 'none'; });
+                });
+            });
+
+            document.getElementById('recrut-form').addEventListener('submit', async (e) => {
+                e.preventDefault(); 
+                const btn = e.target.querySelector('button'); 
+                const originalText = btn.innerText;
+                btn.innerText = "Transmission en cours...";
+
+                // 1. Récupérer les données tapées par le joueur
+                const inputs = e.target.querySelectorAll('input, select, textarea');
+                const pseudo = inputs[0].value;
+                const discordTag = inputs[1].value;
+                const spe = inputs[2].value;
+                const motiv = inputs[3].value;
+
+                // 2. TON LIEN WEBHOOK DISCORD
+                const webhookUrl = "https://discord.com/api/webhooks/1486471535769292843/HprLcbtdykLU_ufv_STNoi0Uqt26jv9b7V1ZtBsZ9pwZA87o-cwy-4S5yYO7rMJwM37b";
+
+                // 3. Préparer le message pour Discord
+                const payload = {
+                    username: "Terminal Sécurisé",
+                    avatar_url: "https://i.imgur.com/O61z9D7.png",
+                    embeds: [{
+                        title: "⚠️ NOUVELLE CANDIDATURE REÇUE",
+                        color: 13107210, 
+                        fields: [
+                            { name: "👤 Pseudo IG / Nom RP", value: pseudo, inline: true },
+                            { name: "💬 Discord", value: discordTag, inline: true },
+                            { name: "🎯 Spécialité visée", value: spe, inline: false },
+                            { name: "📝 Motivations", value: motiv, inline: false }
+                        ],
+                        footer: { text: "Accès public non-classifié" },
+                        timestamp: new Date().toISOString()
+                    }]
+                };
+
+                // 4. Envoyer à Discord
+                try {
+                    await fetch(webhookUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    // Animation de succès
+                    btn.style.display = 'none'; 
+                    document.getElementById('form-success').style.display = 'block';
+                } catch (error) {
+                    btn.innerText = "> ERREUR DE CONNEXION";
+                    btn.style.backgroundColor = "red";
+                    setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = "transparent"; }, 3000);
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
